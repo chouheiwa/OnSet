@@ -113,6 +113,7 @@ describe('builtin plugin apply', () => {
       'anidoodle-styles',
       'huashu-styles',
       'mg-styles',
+      'papercraft-styles',
       'skins',
     ]);
     expect(() => registerBuiltin({ id: 'publishing', apply: () => {} })).toThrow('登记了两次');
@@ -228,6 +229,7 @@ describe('builtin plugin apply', () => {
       'anidoodle-styles',
       'huashu-styles',
       'mg-styles',
+      'papercraft-styles',
       'skins',
     ]);
   });

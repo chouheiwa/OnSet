@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Papercraft 2D Scene</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #d9d2c2; }
+  #root { position: relative; width: __W__px; height: __H__px; overflow: hidden; }
+  #c { display: block; width: 100%; height: 100%; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "papercraft/": "./papercraft/"
+  }
+}
+</script>
+</head>
+<body>
+<!-- 若本镜头只用 Canvas2D（无 GSAP 时间轴），保留 data-no-timeline；若叠加 SceneKit.captions 或 GSAP 时间轴，请移除它并注册 window.__timelines -->
+<div id="root" data-composition-id="main" data-start="0" data-duration="__DUR__" data-width="__W__" data-height="__H__" data-no-timeline>
+  <canvas id="c" width="__W__" height="__H__"></canvas>
+</div>
+<script src="./onset-scene.js"></script>
+<script src="./scene-kit.js"></script>
+<script type="module">
+import * as P2 from 'papercraft/paperkit-2d.js';
+import { createWorld2D, play } from 'papercraft/onset-papercraft-2d.js';
+
+play(({ lights }) => {
+  const world = createWorld2D({
+    canvas: document.getElementById('c'),
+    ground: '#d4ccb8',
+    shadow: lights.day?.leak || '#7b4724',
+    view: { pitch: 40, dist: 70, across: 54 },
+    autoOpen: true,
+    prewarmSeconds: 0.45,
+  });
+
+  // 1. 按本镜头题材印刷地面（水彩晕染 + 纸纤维正片叠底）
+  world.printGround(({ washes, ribbon }) => {
+    washes(['#b9c19c', '#ded4b4', '#c9be9a']);
+    ribbon((z) => Math.sin(z * 0.16) * 4, 2.4, P2.rgba('#f4ead2', 0.85), 0.25);
+  });
+
+  // 2. 在此按本镜头提示词与文案构筑折纸立牌（world.piece / world.cue / world.setCamera）
+  const r = P2.rng(17);
+  const hillPts = P2.roughen(P2.shape.mound(r, { w: 12, h: 6.2, lobes: 5, depth: 0.14 }), r);
+  world.piece(hillPts, (P) => {
+    P.gradient('#8fa782', '#647d5a', 0.55);
+    P.marks('hatch', { color: '#42573c', alpha: 0.35, size: 0.08 });
+    P.innerShade('#3b4a33', { alpha: 0.3, blurPx: 8 });
+  }, { x: 0, z: -6, sway: 0.35 });
+
+  return world;
+});
+</script>
+</body>
+</html>

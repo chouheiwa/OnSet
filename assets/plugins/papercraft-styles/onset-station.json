@@ -1,0 +1,6 @@
+{
+  "id": "papercraft-styles",
+  "version": "1",
+  "name": "Papercraft 折纸立体书（MIT）",
+  "description": "源自 MIT 许可项目 xikhar/papercraft（v0.7.0）的纯代码折纸立体书与微缩纸艺模型风格：提供 2D 纯 Canvas（paperkit-2d + 折痕弹簧物理）与 3D 离线 Three.js（paperkit-3d + paper-life + 离线 three@0.187.0）两套风格，零 CDN、开箱即用、静音无音轨。"
+}

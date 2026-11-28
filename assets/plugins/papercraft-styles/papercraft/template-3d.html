@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Papercraft 3D Scene</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #d4ccb8; }
+  #root { position: relative; width: __W__px; height: __H__px; overflow: hidden; }
+  #c { display: block; width: 100%; height: 100%; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./papercraft/vendor/three/three.module.js",
+    "papercraft/": "./papercraft/"
+  }
+}
+</script>
+</head>
+<body>
+<!-- 若本镜头只用 Three.js Canvas（无 GSAP 时间轴），保留 data-no-timeline；若叠加 SceneKit.captions 或 GSAP 时间轴，请移除它并注册 window.__timelines -->
+<div id="root" data-composition-id="main" data-start="0" data-duration="__DUR__" data-width="__W__" data-height="__H__" data-no-timeline>
+  <canvas id="c" width="__W__" height="__H__"></canvas>
+</div>
+<script src="./onset-scene.js"></script>
+<script src="./scene-kit.js"></script>
+<script type="module">
+import * as THREE from 'three';
+import * as P2 from 'papercraft/paperkit-2d.js';
+import { boxFold, prismFold, layeredCard } from 'papercraft/paperkit-3d.js';
+import { glideSchedule, polarCameraPos } from 'papercraft/paper-motion.js';
+import { createWorld3D, play } from 'papercraft/onset-papercraft-3d.js';
+
+play(({ lights }) => {
+  const world = createWorld3D({
+    canvas: document.getElementById('c'),
+    ground: '#d4ccb8',
+    mood: 'day',
+    view: { pitch: 46, dist: 58, target: [0, 1.5, -4] },
+    autoOpen: true,
+    prewarmSeconds: 0.45,
+  });
+
+  // 1. 按本镜头题材印刷立体书底纸
+  world.printGround(({ washes, torn, band }) => {
+    washes(['#b9c19c', '#ded4b4', '#cbbd98']);
+    torn(band((z) => Math.sin(z * 0.14) * 3.5, 1.8), '#f4ead2');
+  });
+
+  // 2. 在此按本镜头提示词与文案构筑 3D 折纸立牌、插槽树、盒折建筑与微生态（world.popup / boxFold / attachLife）
+  const r = P2.rng(23);
+  const archPts = P2.roughen(P2.shape.mound(r, { w: 7, h: 6.5, lobes: 5, depth: 0.16 }), r);
+  world.popup(archPts, (P) => {
+    P.gradient('#e08a42', '#b8532a', 0.55);
+    P.marks('scallop', { color: '#7a3319', alpha: 0.45, size: 0.14 });
+    P.innerShade('#4a2010', { alpha: 0.35, blurPx: 8 });
+  }, { x: 0, z: -4, cross: 'full', sway: 0.45 });
+
+  // 3. 确定性轨道推镜（glideSchedule + polarCameraPos）
+  const dur = Math.max(2, Number(window.ONSET_SCENE?.duration_seconds) || __DUR__);
+  const glide = glideSchedule({ duration: dur, fps: 60, holdStart: 0.3, easeIn: 1.0, easeOut: 1.0, holdEnd: 0.3 });
+  world.setCameraController((t, _dt, { camera, target }) => {
+    const u = glide(t);
+    const pos = polarCameraPos({ target: [target.x, target.y, target.z], azim: (u - 0.5) * 0.35, pitchDeg: 46, dist: 58 - u * 6, time: t, drift: 0.08 });
+    camera.position.set(pos[0], pos[1], pos[2]);
+    camera.lookAt(target);
+  });
+
+  // 确保 THREE 引用处于活跃作用域（亦可供场景自定义几何/灯光使用）
+  void THREE.MathUtils.clamp(1, 0, 1);
+  return world;
+});
+</script>
+</body>
+</html>

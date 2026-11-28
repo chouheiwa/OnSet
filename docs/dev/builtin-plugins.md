@@ -2,7 +2,7 @@
 
 > 从仓库根 `AGENTS.md` 拆出的开发约定。总则、命令与各份文件的索引见根 `AGENTS.md`；文中「见「某节」」指的节都能从那份索引找到。
 
-内置插件：片场自己的可选功能也写成插件，放在 `assets/plugins/<id>/`（随 `extraResources` 进 .app），用同一份 `onset-station.json`。现在有音乐卡点（`beat`）、歌曲讲解（`song`）、多角色对话（`cast`）、发布（`publishing`）、生成式艺术（`algorithmic-art`）、Lottie 图层（`text-to-lottie`）、LemoLab 风格库（`lemo-styles`，整片风格来源 lemo-opuscar）、anidoodle 代码绘画（`anidoodle-styles`，整片风格来源 anidoodle）与花叔艺术动画（`huashu-styles`，整片风格来源 huashu）。插件也可以在 `apply` 里登记整套流程（`ctx.flow`：路线写 `stations` 或沿用 `base`、提示词段落顺序 `prompt`、`first_page`、`marker`、`excludes`）。
+内置插件：片场自己的可选功能也写成插件，放在 `assets/plugins/<id>/`（随 `extraResources` 进 .app），用同一份 `onset-station.json`。现在有音乐卡点（`beat`）、歌曲讲解（`song`）、多角色对话（`cast`）、发布（`publishing`）、生成式艺术（`algorithmic-art`）、Lottie 图层（`text-to-lottie`）、LemoLab 风格库（`lemo-styles`，整片风格来源 lemo-opuscar）、anidoodle 代码绘画（`anidoodle-styles`，整片风格来源 anidoodle）、花叔艺术动画（`huashu-styles`，整片风格来源 huashu）、MG 动效风格库（`mg-styles`，整片风格来源 mg-styles）与 Papercraft 折纸立体书（`papercraft-styles`，整片风格来源 papercraft）。插件也可以在 `apply` 里登记整套流程（`ctx.flow`：路线写 `stations` 或沿用 `base`、提示词段落顺序 `prompt`、`first_page`、`marker`、`excludes`）。
 
 内置插件的代码一律在进程内登记（`apply(ctx)`）：代码放在 `packages/engine/src/plugins/<id>/`，在 `apply` 里登记站（站点、判断函数、「接下来」的说法与关卡确认的话、提示词段落）、流程、操作、页面、后端接口、网页命令、校验器、渲染技能、镜头扩展块、叙事模式、新建选项、已有判断（`ctx.presentIn`，新建时的互斥用）、整批检查、命令组、前置资源、要传给子进程的环境变量与顶栏步骤，宿主各层从登记表里取，内核不按名字认识任何一个功能。清单（`assets/plugins/<id>/onset-station.json`）只有名字与说明。内置插件常开，没有关掉的办法：它登记的东西对每个项目都在，一个流程用不用得上由流程的声明决定（口播项目的提示词里没有卡点的段落，是因为口播流程的段落顺序里没有它）。功能自己的引擎实现（`beat/`、`song/`、`cast/`、`dialogue/`、`castbeats/`）仍在原包里，由插件的 apply 引用。
 

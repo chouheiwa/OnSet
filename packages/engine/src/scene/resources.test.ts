@@ -3,11 +3,11 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import '../plugin';
 import { freezeInput } from '../memory';
-import { containedPath } from '../studio/sessions';
 import { inputs } from '../renderassets';
-import { buildPrompt, load } from './scene';
+import { containedPath } from '../studio/sessions';
 import { fingerprint } from './record';
-import { FontsCSSFile, prepareResources, resourceFiles, writeFontsCSS } from './resources';
+import { describeMountedLibraries, FontsCSSFile, prepareResources, resourceFiles, writeFontsCSS } from './resources';
+import { buildPrompt, load } from './scene';
 import { tempDir, writeScene } from './testsupport';
 
 function fixture() {
@@ -15,10 +15,14 @@ function fixture() {
   fs.writeFileSync(path.join(root, 'onset.conf'), '');
   const dir = path.join(root, 'scenes', 'one');
   fs.mkdirSync(path.dirname(dir));
-  fs.renameSync(writeScene('{"id":"one","duration_seconds":1,"output":"out.mp4","transcript":"transcript.srt","text":"hello"}'), dir);
+  fs.renameSync(
+    writeScene('{"id":"one","duration_seconds":1,"output":"out.mp4","transcript":"transcript.srt","text":"hello"}'),
+    dir,
+  );
   const skills = path.join(root, '.agents', 'skills');
   for (const [rel, body] of Object.entries({
-    'assets/fonts/body.woff2': 'font', 'assets/vendor/lib.min.js': 'window.lib = 1',
+    'assets/fonts/body.woff2': 'font',
+    'assets/vendor/lib.min.js': 'window.lib = 1',
     '.agents/skills/scene-kit/scene-kit.js': 'window.SceneKit = {}',
     '.agents/skills/onset-film-style/onset-film-style.json': '{"source":"huashu","slug":"test"}',
     '.agents/skills/onset-film-style/huashu/lib/util.js': 'window.U = {}',
@@ -34,7 +38,9 @@ describe('scene resource integration', () => {
   it('does not change old prompts or add resource fingerprint parts before the first managed render', () => {
     const f = fixture();
     expect(buildPrompt(f.s, f.resolved)).not.toContain('共享渲染资源');
-    expect(Object.keys(fingerprint(f.s, 'claude', f.resolved).parts!).some((key) => key.startsWith('asset:'))).toBe(false);
+    expect(Object.keys(fingerprint(f.s, 'claude', f.resolved).parts!).some((key) => key.startsWith('asset:'))).toBe(
+      false,
+    );
   });
   it('prepares project fonts, JS and plugin-declared runtime resources for preview', () => {
     const f = fixture();
@@ -60,7 +66,9 @@ describe('scene resource integration', () => {
 
   it('does not mount the default film runtime when the scene opts out', () => {
     const f = fixture();
-    expect(resourceFiles({ ...f.s, film_style: 'none' }, f.resolved).map((r) => r.path)).not.toContain('huashu/lib/util.js');
+    expect(resourceFiles({ ...f.s, film_style: 'none' }, f.resolved).map((r) => r.path)).not.toContain(
+      'huashu/lib/util.js',
+    );
   });
 
   it('takes runtime assets from the explicitly selected scene style', () => {
@@ -95,12 +103,14 @@ describe('scene resource integration', () => {
 
   it('distinguishes named font weights and refuses to overwrite hand-written or symlinked onset-fonts.css', () => {
     const dir = tempDir();
-    expect(writeFontsCSS(dir, [
-      'assets/fonts/inter-semibold.woff2',
-      'assets/fonts/inter-extrabold.woff2',
-      'assets/fonts/inter-thin.woff2',
-      'assets/fonts/inter-black.woff2',
-    ])).toBe(true);
+    expect(
+      writeFontsCSS(dir, [
+        'assets/fonts/inter-semibold.woff2',
+        'assets/fonts/inter-extrabold.woff2',
+        'assets/fonts/inter-thin.woff2',
+        'assets/fonts/inter-black.woff2',
+      ]),
+    ).toBe(true);
     const css = fs.readFileSync(path.join(dir, FontsCSSFile), 'utf8');
     expect(css).toContain('font-weight: 600;');
     expect(css).toContain('font-weight: 800;');
@@ -120,5 +130,17 @@ describe('scene resource integration', () => {
       fs.symlinkSync(target, path.join(dir, FontsCSSFile));
       expect(() => writeFontsCSS(dir, ['assets/fonts/inter-bold.woff2'])).toThrow('符号链接');
     }
+  });
+
+  it('extracts public JS exports for unminified helper libraries up to 128 KB', () => {
+    const dir = tempDir();
+    const rel = 'papercraft/big-kit.js';
+    const file = path.join(dir, rel);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    // 80 KB（大于旧的 64 KB 上限、小于新的 128 KB 上限）
+    const body = 'export function printCard(pts, opts) { return pts; }\n' + '// '.padEnd(80 * 1024, 'x') + '\n';
+    fs.writeFileSync(file, body, 'utf8');
+    const summary = describeMountedLibraries(dir, [rel]);
+    expect(summary).toEqual(['`papercraft/big-kit.js`：printCard(pts, opts)']);
   });
 });

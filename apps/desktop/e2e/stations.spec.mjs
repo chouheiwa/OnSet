@@ -317,11 +317,12 @@ test('a plugin is added in settings without a project, every project gets it, an
   await expect(song.getByRole('button', { name: '去掉' })).toHaveCount(0);
   await builtin.scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('builtin-features.png') });
-  await expect(builtin.locator('li[data-builtin]')).toHaveCount(11);
+  await expect(builtin.locator('li[data-builtin]')).toHaveCount(12);
   await expect(builtin.locator('li[data-builtin="lemo-styles"]')).toContainText('LemoLab 风格库');
   await expect(builtin.locator('li[data-builtin="anidoodle-styles"]')).toContainText('anidoodle 代码绘画');
   await expect(builtin.locator('li[data-builtin="huashu-styles"]')).toContainText('花叔艺术动画');
   await expect(builtin.locator('li[data-builtin="mg-styles"]')).toContainText('MG 动效风格库（MIT）');
+  await expect(builtin.locator('li[data-builtin="papercraft-styles"]')).toContainText('Papercraft 折纸立体书（MIT）');
   await expect(builtin.locator('li[data-builtin="cast"]')).toContainText('多角色对话');
   // 「详情」照实列出这个功能在片场里登记了什么。
   const cast = builtin.locator('li[data-builtin="cast"]');

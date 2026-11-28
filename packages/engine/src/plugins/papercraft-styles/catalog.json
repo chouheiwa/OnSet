@@ -1,0 +1,96 @@
+{
+  "source": "papercraft",
+  "license": "MIT",
+  "upstream": "xikhar/papercraft",
+  "version": "papercraft@0.7.0",
+  "commit": "30e9aaff8aa244e2237f3ea8921952dcd2e8cda8",
+  "three_version": "0.187.0",
+  "styles": [
+    {
+      "slug": "popup-2d",
+      "order": "01",
+      "mode": "2d",
+      "cn": "折纸立体书 2D",
+      "en": "Papercraft Pop-up 2D",
+      "category_cn": "折纸与立体书",
+      "category_en": "Papercraft & Pop-up",
+      "uses": ["故事科普", "图文解说", "儿童绘本", "微缩叙事"],
+      "summary": "纯 Canvas2D 程序化折纸立体书：纸纤维印刷立牌、单侧高光剪纸边缘、折痕弹簧弹起与移轴微距景深，零 WebGL、逐帧比特级确定。",
+      "tags": ["canvas2d", "papercraft", "pop-up", "mit"],
+      "engine_contract": {
+        "required": ["canvas2d"],
+        "severity": "warn",
+        "note": "必须通过 paperkit-2d.js + onset-papercraft-2d.js 的 Canvas2D 管线印刷纸卡与折痕立牌；严禁退化为普通扁平 DOM 卡片或 CSS 阴影拼贴。"
+      },
+      "motion_effects": ["motion-prompt:010", "motion-prompt:002", "motion-prompt:140"],
+      "palette": {
+        "bg": "#D9D2C2",
+        "surface": "#FBF4E8",
+        "primary": "#C9542B",
+        "secondary": "#3A8C84",
+        "accent": "#E3B04B",
+        "ink": "#3A2412"
+      },
+      "typography": "温润人文衬线或手写圆体大标题搭配清晰无衬线正文字幕；文字尽量印在纸卡表面或用 SceneKit.captions 叠于下方清晰安全区。",
+      "composition": "俯拍 40° 立体书微距舞台，印刷底纸铺满四边不露书边与天空；中景清晰带排布 4–8 件成组折纸立牌，前景大纸片自然虚化，9:16 竖屏自动上提焦点避让底部字幕区。",
+      "texture": "哑光纤维卡纸（无高光无塑料感）、3–5 层叠印色块加微短暖影与受光侧细白边、轮廓 1.5–2.5px 深棕剪裁边（折叠底边不画剪裁边）、随世界着色的柔和彩影。",
+      "motion_grammar": "所有纸片只绕底部折痕旋转起落（FlapSpring 8%–15% 过冲 + 2–3 次轻颤、约 1s 停稳），按叠放顺序错峰 0.05–0.1s 弹起；严禁整卡缩放弹出或透明度淡入。",
+      "recipes": {
+        "transition": "整页立牌按由近及远逆序顺折痕轻拍放平，随后新场景从最远层依次弹起展开。",
+        "impact": "关键主体立牌到位瞬间触发 12% 折痕过冲回弹 + 接触阴影收紧，周边小纸片微幅风摆跟动。",
+        "camera": "微距机位轻柔横移或缓慢推近（world.setCamera），清晰带始终锁住核心叙事主体。",
+        "grain": "paperSheet 程序化纸纤维正片叠底（multiply），绝不叠加闪烁噪点或整屏色偏滤镜。",
+        "secondary": "立牌受 windSway 确定性微风摇曳（振幅 0.5°–1.5°），水面漂浮件低频正弦轻晃。"
+      },
+      "taboos": [
+        "严禁使用 paper-sound.js / paper-music.js 或输出任何音轨（镜头必须静音）",
+        "严禁露出书页外缘、桌面或空白天空（底纸必须铺满画幅四边）",
+        "严禁使用中性灰/纯黑投影、四周均匀白色贴纸描边或塑料高光",
+        "严禁用 scale/opacity 淡入代替绕折痕旋转弹起"
+      ]
+    },
+    {
+      "slug": "popup-3d",
+      "order": "02",
+      "mode": "3d",
+      "cn": "折纸立体书 3D",
+      "en": "Papercraft Pop-up 3D",
+      "category_cn": "折纸与立体书",
+      "category_en": "Papercraft & Pop-up",
+      "uses": ["世界观叙事", "架构与城市", "沉浸故事片", "产品立体演示"],
+      "summary": "离线 Three.js 真 3D 折纸微缩模型：插槽十字树、盒折建筑、PCSS 彩色软阴影、移轴微距后期与 paper-life 纸艺微生态，零 CDN 开箱即用。",
+      "tags": ["three.js", "3d", "papercraft", "pop-up", "mit"],
+      "engine_contract": {
+        "required": ["threejs"],
+        "severity": "error",
+        "note": "必须使用离线 three@0.187.0 与 paperkit-3d.js / onset-papercraft-3d.js 渲染真实 Three.js 3D 折纸立体书场景；严禁用 CSS preserve-3d / perspective / rotateX / rotateY 伪造 3D。"
+      },
+      "motion_effects": ["motion-prompt:010", "motion-prompt:030", "motion-prompt:033"],
+      "palette": {
+        "bg": "#CFC4A1",
+        "surface": "#F7F0E2",
+        "primary": "#C8513B",
+        "secondary": "#46AA9E",
+        "accent": "#FFC45A",
+        "ink": "#3A2412"
+      },
+      "typography": "3D 场景内建筑标牌与路标直接印进卡纸贴图，解说字幕统一用 SceneKit.captions 叠于顶层可读区，禁止扭曲透视正文文字。",
+      "composition": "长焦微距镜头（FOV 24°–32°、俯角 42°–52°）俯视立体书世界，底纸铺满四边；立牌按 4–8 件异构组团密布清晰带，竖直圆物用 90° 插槽十字卡、建筑用盒折体块，前景大卡虚化增强微缩比例感。",
+      "texture": "真实厚度薄卡纸（约主体高 1.5%–3%）配纸纹法线贴图与绝对哑光漫反射（wrap ~0.3）；低位侧主光配正面补光，PCSS 软阴影随离地高度扩散并染入世界阴影色（lights.json）。",
+      "motion_grammar": "近处叠在最上方的立牌先绕底折痕弹起（FlapSpring 过冲回弹），配合 glideSchedule + polarCameraPos 平滑轨道环绕或推镜、mixMood 日夜光照渐变与 paper-life 纸片飘叶/飞鸟。",
+      "recipes": {
+        "transition": "镜头随轨道推过前景虚化大纸片或经 H.setOpen(false) 收折再展开切入下一幕世界。",
+        "impact": "核心地标盒折建筑到位瞬间触发折痕微颤 + H.mixMood 局部光线强调或暖窗点亮。",
+        "camera": "glideSchedule 驱动 polarCameraPos 确定性环绕/推拉（经 checkContinuity 无跳变），配合移轴焦点转移。",
+        "grain": "paperTextures 程序化纸纤维与法线贴图叠加，PaperPost 移轴景深与轻暗角统一收口。",
+        "secondary": "paper-life.js 确定性微生态（纸片落叶、剪纸飞鸟、炊烟、萤火虫）与 windSway 折痕风摆。"
+      },
+      "taboos": [
+        "严禁用 CSS preserve-3d / perspective / rotateX / rotateY 冒充 3D 立体书",
+        "严禁引用任何远程 CDN（必须使用离线 ./papercraft/vendor/three/three.module.js）",
+        "严禁使用 paper-sound.js / paper-music.js 或输出音轨（镜头产物必须静音）",
+        "严禁露出地平线、天空盒或书桌边缘，严禁出现塑料高光与灰黑死阴影"
+      ]
+    }
+  ]
+}

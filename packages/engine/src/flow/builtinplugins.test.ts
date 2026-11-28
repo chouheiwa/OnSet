@@ -48,6 +48,7 @@ describe('builtin plugins', () => {
       'huashu-styles',
       'lemo-styles',
       'mg-styles',
+      'papercraft-styles',
       'publishing',
       'skins',
       'song',

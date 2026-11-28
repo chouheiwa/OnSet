@@ -24,6 +24,7 @@ describe('stations API', () => {
       ['huashu-styles', true],
       ['lemo-styles', true],
       ['mg-styles', true],
+      ['papercraft-styles', true],
       ['publishing', true],
       ['skins', true],
       ['song', true],
