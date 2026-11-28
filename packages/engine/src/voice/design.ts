@@ -10,15 +10,16 @@ import path from 'node:path';
 import { BreezeTTS2, TTSProviders } from '../config/providers';
 import { modelDir, modelReady, toolStatus } from '../toolinstall';
 import { findOptional } from '../toolpath';
-import { runVoice } from './runner';
 import { windowsBreezeStatus } from '../windowsruntime/breeze';
+import { runVoice } from './runner';
 
 /**
  * 默认的朗读稿：录自己的声音、设计新声音时都念它。十秒左右（参考音频要 3 到 30 秒），
  * 有陈述、有疑问、有停顿，克隆时语气才有东西可学；没有生僻字、英文和数字，念错的机会少，
  * 逐字稿也就对得上。
  */
-export const SampleText = '大家好，欢迎来到今天的节目。这一期我们聊一个看起来简单、其实很多人都想错了的问题：为什么坚持，往往比开始更难？';
+export const SampleText =
+  '大家好，欢迎来到今天的节目。这一期我们聊一个看起来简单、其实很多人都想错了的问题：为什么坚持，往往比开始更难？';
 
 const draftsDir = '.drafts';
 const draftTTLms = 24 * 60 * 60 * 1000;
@@ -32,13 +33,25 @@ export interface DesignStatus {
   problem: string;
 }
 
-export function designStatus(env: Record<string, string | undefined>, platform = process.platform, arch = process.arch): DesignStatus {
+export function designStatus(
+  env: Record<string, string | undefined>,
+  platform = process.platform,
+  arch = process.arch,
+): DesignStatus {
   if (platform === 'win32' && arch === 'x64') {
     const status = windowsBreezeStatus(env, platform);
-    return { ready: status.ok, supported: true, problem: status.ok ? '' : '还没准备好 Windows Breeze CUDA 运行时与 Q8 模型，请在工具准备页安装并完成合成自检' };
+    return {
+      ready: status.ok,
+      supported: true,
+      problem: status.ok ? '' : '还没准备好 Windows Breeze CUDA 运行时与 Q8 模型，请在工具准备页安装并完成合成自检',
+    };
   }
   if (platform !== 'darwin' || arch !== 'arm64') {
-    return { ready: false, supported: false, problem: '按描述设计音色要用本机的 Breeze TTS 2，只能在 Apple Silicon 的 Mac 上运行' };
+    return {
+      ready: false,
+      supported: false,
+      problem: '按描述设计音色要用本机的 Breeze TTS 2，只能在 Apple Silicon 的 Mac 上运行',
+    };
   }
   if (!toolStatus(TTSProviders.find((p) => p.id === 'mlx')!.install, env).ok || !modelReady(BreezeTTS2, env)) {
     return { ready: false, supported: true, problem: '还没装 Breeze TTS 2（约 4.6 GB）' };
@@ -69,7 +82,13 @@ export function getDraft(root: string, id: string): Draft {
   } catch {
     throw new Error('没有这段试听（试听只保留一天）');
   }
-  return { id, instruction: String(raw.instruction ?? ''), text: String(raw.text ?? ''), audio: path.join(draftRoot(root), id + '.wav'), created: String(raw.created ?? '') };
+  return {
+    id,
+    instruction: String(raw.instruction ?? ''),
+    text: String(raw.text ?? ''),
+    audio: path.join(draftRoot(root), id + '.wav'),
+    created: String(raw.created ?? ''),
+  };
 }
 
 function pruneDrafts(root: string, now: number): void {
@@ -104,7 +123,8 @@ export interface DesignOptions {
 export async function design(root: string, opts: DesignOptions): Promise<Draft> {
   if (root === '') throw new Error('无法确定音色库目录：环境里没有 HOME');
   const instruction = opts.instruction.trim();
-  if (instruction === '') throw new Error('先写一句描述：性别、年龄段、音色和语气，例如「三十多岁的男性，声音沉稳清晰，语气平静、真诚」');
+  if (instruction === '')
+    throw new Error('先写一句描述：性别、年龄段、音色和语气，例如「三十多岁的男性，声音沉稳清晰，语气平静、真诚」');
   if ([...instruction].length > 200) throw new Error('描述写一两句就够了（200 字以内）');
   const text = (opts.text ?? '').trim() || SampleText;
   if ([...text].length > 120) throw new Error('试听文字太长：120 字以内（存进音色库的参考音频最长 30 秒）');
@@ -122,21 +142,40 @@ export async function design(root: string, opts: DesignOptions): Promise<Draft> 
   try {
     const args = [
       ...(process.platform === 'win32' ? [] : ['--model', modelDir(BreezeTTS2, opts.env)]),
-      '--text', text,
-      '--voice', 'S0',
-      '--instruct', instruction,
-      '--cfg_scale', '4',
-      '--output_path', work,
-      '--file_prefix', 'take',
+      '--text',
+      text,
+      '--voice',
+      'S0',
+      '--instruct',
+      instruction,
+      '--cfg_scale',
+      '4',
+      '--temperature',
+      '0.9',
+      ...(process.platform === 'win32' ? [] : ['--top_p', '1.0', '--repetition_penalty', '1.0']),
+      '--output_path',
+      work,
+      '--file_prefix',
+      'take',
       '--join_audio',
-      '--audio_format', 'wav',
+      '--audio_format',
+      'wav',
     ];
     await runVoice(command, args, { ...opts.env, HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1' }, opts.signal);
     const take = path.join(work, 'take.wav');
     if (!fs.existsSync(take)) throw new Error('Breeze 没有生成音频');
     fs.renameSync(take, path.join(dir, id + '.wav'));
-    const draft: Draft = { id, instruction, text, audio: path.join(dir, id + '.wav'), created: new Date(now).toISOString() };
-    fs.writeFileSync(path.join(dir, id + '.json'), JSON.stringify({ instruction, text, created: draft.created }) + '\n');
+    const draft: Draft = {
+      id,
+      instruction,
+      text,
+      audio: path.join(dir, id + '.wav'),
+      created: new Date(now).toISOString(),
+    };
+    fs.writeFileSync(
+      path.join(dir, id + '.json'),
+      JSON.stringify({ instruction, text, created: draft.created }) + '\n',
+    );
     return draft;
   } finally {
     fs.rmSync(work, { recursive: true, force: true });

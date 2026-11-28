@@ -97,12 +97,12 @@ export const TTSProviders: readonly TTSProvider[] = [
   },
 ];
 
-/** mlx-audio：语音合成与 Qwen3 强制对齐是同一个包；依赖里有预发布版本，要放行。 */
+/** mlx-audio：语音合成与 Qwen3 强制对齐是同一个包；依赖里有预发布版本，要放行。0.6.5 起修复 Qwen3 编解码器误将码字 0 当作 padding 截断 Breeze 段尾的缺陷。 */
 function mlxAudio(bins: string[]): ToolSpec {
   return {
     kind: 'uv-tool',
     package: 'mlx-audio',
-    version: '0.6.1',
+    version: '0.6.5',
     bins,
     prerelease: true,
     platforms: ['darwin/arm64'],

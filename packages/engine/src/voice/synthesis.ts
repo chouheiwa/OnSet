@@ -6,10 +6,13 @@ import { marshalIndent } from '../gojson';
 import { newToolchain } from '../mediaprobe';
 import { MissingError } from '../prereq';
 import { modelReady } from '../toolinstall';
+import { generateTake } from './adapters';
+import { designStatus } from './design';
 import { defaultDir } from './dir';
 import { defaultName, get } from './library';
-import { designStatus } from './design';
-import { generateTake } from './adapters';
+import { normalizeSegmentAudio, SegmentTailFadeSeconds } from './tail';
+
+export { SegmentTailFadeSeconds };
 
 /** 多段配音（单换行分段）默认在段落之间插入的静音停顿（毫秒）。 */
 export const DefaultParagraphPauseMs = 650;
@@ -48,6 +51,7 @@ export interface SynthesisResult {
   sources: string;
   duration_seconds: number;
   alignment?: string;
+  warnings?: string[];
 }
 
 const json = (file: string, value: unknown) => fs.writeFileSync(file, marshalIndent(value) + '\n');
@@ -57,11 +61,14 @@ const roundSec = (value: number) => Math.round(value * 1_000_000) / 1_000_000;
 function tencentParts(text: string): string[] {
   const chars = [...text];
   const parts: string[] = [];
-  for (let at = 0; at < chars.length;) {
+  for (let at = 0; at < chars.length; ) {
     let end = Math.min(at + 150, chars.length);
     if (end < chars.length) {
       for (let i = end - 1; i > at; i--) {
-        if (/[。！？!?；;，,\n]/u.test(chars[i])) { end = i + 1; break; }
+        if (/[。！？!?；;，,\n]/u.test(chars[i])) {
+          end = i + 1;
+          break;
+        }
       }
     }
     parts.push(chars.slice(at, end).join(''));
@@ -97,7 +104,8 @@ function buildChunks(
       paragraphs.forEach((para, idx) => {
         const next = paragraphs[idx + 1];
         const boundaryKind = next ? (next.afterBlank ? 'chapter' : 'paragraph') : undefined;
-        const boundaryPause = boundaryKind === 'chapter' ? chapterPauseMs : boundaryKind === 'paragraph' ? paragraphPauseMs : 0;
+        const boundaryPause =
+          boundaryKind === 'chapter' ? chapterPauseMs : boundaryKind === 'paragraph' ? paragraphPauseMs : 0;
         if (boundaryPause > 0) anyPause = true;
         const sub = providerId === 'tencent' ? tencentParts(para.text) : [para.text];
         sub.forEach((part, subIdx) => {
@@ -117,19 +125,32 @@ function buildChunks(
 }
 
 function validate(opts: SynthesisOptions): void {
-  if (!TTSProviders.some((p) => p.id === opts.provider)) throw new Error(`配音服务 ${opts.provider} 不由内置合成器处理，请调用该插件登记的配音工具`);
+  if (!TTSProviders.some((p) => p.id === opts.provider))
+    throw new Error(`配音服务 ${opts.provider} 不由内置合成器处理，请调用该插件登记的配音工具`);
   if (!opts.text.trim()) throw new Error('配音文稿不能为空');
   if (opts.text.includes('\0')) throw new Error('配音文稿不能包含 NUL');
   if (path.extname(opts.output).toLowerCase() !== '.wav') throw new Error('output 必须是 .wav 文件');
   if (opts.speed !== undefined) {
-    let min = 0.5, max = 2;
-    if (opts.provider === 'tencent') { min = -2; max = 6; }
-    else if (opts.provider === 'elevenlabs') { min = 0.7; max = 1.2; }
-    if (!Number.isFinite(opts.speed) || opts.speed < min || opts.speed > max) throw new Error(`speed 必须在 ${min}..${max} 之间`);
-    if (opts.provider === 'breeze' || opts.provider === 'mlx') throw new Error('本地配音模型不支持 speed，请用 instruction 指导语速');
+    let min = 0.5,
+      max = 2;
+    if (opts.provider === 'tencent') {
+      min = -2;
+      max = 6;
+    } else if (opts.provider === 'elevenlabs') {
+      min = 0.7;
+      max = 1.2;
+    }
+    if (!Number.isFinite(opts.speed) || opts.speed < min || opts.speed > max)
+      throw new Error(`speed 必须在 ${min}..${max} 之间`);
+    if (opts.provider === 'breeze' || opts.provider === 'mlx')
+      throw new Error('本地配音模型不支持 speed，请用 instruction 指导语速');
   }
   if (opts.paragraphPauseMs !== undefined) {
-    if (!Number.isFinite(opts.paragraphPauseMs) || opts.paragraphPauseMs < 0 || opts.paragraphPauseMs > MaxParagraphPauseMs) {
+    if (
+      !Number.isFinite(opts.paragraphPauseMs) ||
+      opts.paragraphPauseMs < 0 ||
+      opts.paragraphPauseMs > MaxParagraphPauseMs
+    ) {
       throw new Error(`paragraph_pause_ms 必须在 0..${MaxParagraphPauseMs} 之间`);
     }
   }
@@ -138,8 +159,10 @@ function validate(opts: SynthesisOptions): void {
       throw new Error(`chapter_pause_ms 必须在 0..${MaxChapterPauseMs} 之间`);
     }
   }
-  if (opts.instruction && !['breeze', 'bailian', 'mlx'].includes(opts.provider)) throw new Error(`${opts.provider} 不支持 instruction`);
-  if (opts.pronunciation?.length && opts.provider !== 'minimax') throw new Error('pronunciation 只适用于 MiniMax；其他服务请用终稿的朗读标记');
+  if (opts.instruction && !['breeze', 'bailian', 'mlx'].includes(opts.provider))
+    throw new Error(`${opts.provider} 不支持 instruction`);
+  if (opts.pronunciation?.length && opts.provider !== 'minimax')
+    throw new Error('pronunciation 只适用于 MiniMax；其他服务请用终稿的朗读标记');
   if (opts.ssml && opts.provider !== 'bailian') throw new Error('ssml 只适用于百炼');
 }
 
@@ -150,7 +173,8 @@ export async function synthesize(opts: SynthesisOptions): Promise<SynthesisResul
   const provider = TTSProviders.find((p) => p.id === opts.provider)!;
   const output = path.resolve(opts.output);
   const sources = output.slice(0, -4) + '.tts';
-  if (fs.existsSync(output) || fs.existsSync(sources)) throw new Error('配音产物已存在，请使用新的版本文件名：' + output);
+  if (fs.existsSync(output) || fs.existsSync(sources))
+    throw new Error('配音产物已存在，请使用新的版本文件名：' + output);
   let voice = opts.voice?.trim() ?? '';
   let reference: ReturnType<typeof get> | undefined;
   if (provider.id === 'breeze') {
@@ -168,9 +192,11 @@ export async function synthesize(opts: SynthesisOptions): Promise<SynthesisResul
   fs.mkdirSync(path.dirname(output), { recursive: true });
   // 同一路径只能有一个生成任务，防止两个请求同时检查到「尚不存在」。
   const lock = sources + '.lock';
-  try { fs.mkdirSync(lock); }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('这个配音输出正在生成，请等原任务结束：' + output);
+  try {
+    fs.mkdirSync(lock);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST')
+      throw new Error('这个配音输出正在生成，请等原任务结束：' + output);
     throw error;
   }
   let work = '';
@@ -192,12 +218,36 @@ export async function synthesize(opts: SynthesisOptions): Promise<SynthesisResul
       const rel = `pause-${chunk.pauseAfterMs}ms.wav`;
       await tc.transcode(
         path.join(work, rel),
-        ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-af', `atrim=end_sample=${pauseSamples}`, '-vn', '-ac', '2', '-ar', '48000', '-c:a', 'pcm_s16le'],
+        [
+          '-f',
+          'lavfi',
+          '-i',
+          'anullsrc=r=48000:cl=stereo',
+          '-af',
+          `atrim=end_sample=${pauseSamples}`,
+          '-vn',
+          '-ac',
+          '2',
+          '-ar',
+          '48000',
+          '-c:a',
+          'pcm_s16le',
+        ],
         opts.signal,
       );
       pauseCache.set(chunk.pauseAfterMs, { rel, duration: pauseSamples / 48000 });
     }
-    const segments: { audio: string; text: string; start_seconds: number; duration_seconds: number; pause_after_ms?: number }[] = [];
+    const segments: {
+      audio: string;
+      text: string;
+      start_seconds: number;
+      duration_seconds: number;
+      pause_after_ms?: number;
+      abrupt_tail?: boolean;
+      tail_silence_ms?: number;
+      tail_50ms_db?: number;
+    }[] = [];
+    const abruptSegments: number[] = [];
     const concatEntries: string[] = [];
     const mergedAlignment: { text: string; start: number; end: number }[] = [];
     let hasAlignment = false;
@@ -213,13 +263,16 @@ export async function synthesize(opts: SynthesisOptions): Promise<SynthesisResul
       if (take.alignment) {
         hasAlignment = true;
         for (const item of take.alignment) {
-          mergedAlignment.push({ text: item.text, start: roundSec(elapsed + item.start), end: roundSec(elapsed + item.end) });
+          mergedAlignment.push({
+            text: item.text,
+            start: roundSec(elapsed + item.start),
+            end: roundSec(elapsed + item.end),
+          });
         }
       }
       const audio = path.join(dir, 'audio.wav');
-      await tc.transcode(audio, ['-i', raw, '-vn', '-ac', '2', '-ar', '48000', '-c:a', 'pcm_s16le'], opts.signal);
-      const duration = tc.probe(audio).duration_seconds;
-      if (!Number.isFinite(duration) || duration <= 0) throw new Error('配音音频时长无效');
+      const { duration, tail } = await normalizeSegmentAudio(tc, raw, audio, opts.signal);
+      if (tail?.abrupt) abruptSegments.push(index + 1);
       const relAudio = path.relative(work, audio).split(path.sep).join('/');
       segments.push({
         audio: relAudio,
@@ -227,6 +280,9 @@ export async function synthesize(opts: SynthesisOptions): Promise<SynthesisResul
         start_seconds: roundSec(elapsed),
         duration_seconds: duration,
         ...(chunk.pauseAfterMs > 0 ? { pause_after_ms: chunk.pauseAfterMs } : {}),
+        ...(tail?.abrupt
+          ? { abrupt_tail: true, tail_silence_ms: tail.tailSilenceMs, tail_50ms_db: tail.tail50msDb }
+          : {}),
       });
       concatEntries.push(`file '${relAudio}'`);
       elapsed = roundSec(elapsed + duration);
@@ -240,17 +296,36 @@ export async function synthesize(opts: SynthesisOptions): Promise<SynthesisResul
       json(path.join(work, 'align.json'), mergedAlignment);
       alignment = path.join(sources, 'align.json');
     }
+    const warnings: string[] = [];
+    if (abruptSegments.length > 0) {
+      const warning = `检测到 ${abruptSegments.length} 个分段结尾疑似高能量硬截断（第 ${abruptSegments.join('、')} 段），建议复核尾音并确认配音工具版本`;
+      warnings.push(warning);
+      opts.progress?.(`警告：${warning}`);
+    }
     opts.progress?.('正在整理配音产物');
     const final = path.join(work, 'audio.wav');
     if (concatEntries.length === 1) fs.copyFileSync(path.join(work, segments[0].audio), final);
     else {
       fs.writeFileSync(path.join(work, 'concat.txt'), concatEntries.join('\n') + '\n');
-      await tc.transcode(final, ['-f', 'concat', '-safe', '1', '-i', path.join(work, 'concat.txt'), '-c:a', 'pcm_s16le'], opts.signal);
+      await tc.transcode(
+        final,
+        ['-f', 'concat', '-safe', '1', '-i', path.join(work, 'concat.txt'), '-c:a', 'pcm_s16le'],
+        opts.signal,
+      );
     }
     const duration = tc.probe(final).duration_seconds;
     const hasParaPause = chunks.some((c) => c.kind === 'paragraph');
     const hasChapterPause = chunks.some((c) => c.kind === 'chapter');
-    const result: SynthesisResult = { provider: provider.id, voice, audio: output, report: path.join(sources, 'report.json'), sources, duration_seconds: duration, ...(alignment ? { alignment } : {}) };
+    const result: SynthesisResult = {
+      provider: provider.id,
+      voice,
+      audio: output,
+      report: path.join(sources, 'report.json'),
+      sources,
+      duration_seconds: duration,
+      ...(alignment ? { alignment } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
     json(path.join(work, 'report.json'), {
       ...result,
       schema: 1,

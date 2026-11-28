@@ -10,6 +10,7 @@ import { binDir, dataDir, findOptional, npmCommand, withNode } from '../toolpath
 import { ensureWindowsBreeze, windowsBreezeStatus } from '../windowsruntime/breeze';
 import { ensureUV } from './binaries';
 import { GitHubMirrorEnv, type InstallOptions, mirrored, platformKey, requireBinDir, runCommandIn } from './download';
+import { compareToolVersions, uvToolInstalledVersion } from './uv_version';
 
 /** uv 下载的独立 Python 放在哪：<数据目录>/python，节拍分析环境与 Python 类工具共用。 */
 export function pythonInstallDir(env: Record<string, string | undefined>): string {
@@ -43,15 +44,24 @@ export function toolSupported(spec: ToolSpec): boolean {
   return !platforms || platforms.includes(platformKey());
 }
 
-/** 工具的命令都能找到（onset 装的或用户自己装的）。 */
+/** 工具的命令都能找到且 uv-tool 版本满足下限（onset 装的或用户自己装的）。 */
 export function toolStatus(spec: ToolSpec, env: Record<string, string | undefined>): { ok: boolean; where: string } {
   if (spec.kind === 'native-breeze') return windowsBreezeStatus(env);
   const found = toolBins(spec).map((bin) => findOptional(bin, env));
-  if (found.every((f) => f !== '')) return { ok: true, where: found[0] };
-  return { ok: false, where: binDir(env) };
+  if (!found.every((f) => f !== '')) return { ok: false, where: binDir(env) };
+  if (spec.kind === 'uv-tool') {
+    for (const file of found) {
+      const installed = uvToolInstalledVersion(spec, file, env);
+      if (installed !== null) {
+        const cmp = compareToolVersions(installed, spec.version);
+        if (cmp !== null && cmp < 0) return { ok: false, where: file };
+      }
+    }
+  }
+  return { ok: true, where: found[0] };
 }
 
-/** 装好一个工具（命令都能找到就不动），返回第一个命令的路径。 */
+/** 装好一个工具（命令都能找到且版本达标就不动），返回第一个命令的路径。 */
 export async function ensureTool(spec: ToolSpec, opts: InstallOptions): Promise<string> {
   const report = opts.progress ?? (() => {});
   const status = toolStatus(spec, opts.env);
@@ -80,7 +90,17 @@ export async function ensureTool(spec: ToolSpec, opts: InstallOptions): Promise<
     }
   }
   const after = toolStatus(spec, opts.env);
-  if (!after.ok) throw new Error(`装完了但找不到 ${toolBins(spec).join('、')}：包结构可能已变`);
+  if (!after.ok) {
+    if (spec.kind === 'uv-tool') {
+      const installed = uvToolInstalledVersion(spec, after.where, opts.env);
+      if (installed !== null) {
+        throw new Error(
+          `装完了但 ${spec.package} 版本仍低于 ${spec.version}（当前 ${installed}，路径 ${after.where}）`,
+        );
+      }
+    }
+    throw new Error(`装完了但找不到 ${toolBins(spec).join('、')}：包结构可能已变`);
+  }
   report({ stage: '已就绪', percent: 100 });
   return after.where;
 }
